@@ -37,7 +37,9 @@ const WalletPage: React.FC = () => {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 gap-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-         <div className="grid grid-cols-12 h-40 bg-secondary/30 "></div>
+         <div className="grid grid-cols-12 h-40 bg-secondary/30 ">
+         
+         </div>
         </div>
 
         {/* Stats */}
