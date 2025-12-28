@@ -34,6 +34,7 @@ const ReferralPanel: React.FC = () => {
           text: `Use my referral code ${referralCode} to get 10 bonus MNX coins!`,
           url: referralLink,
         })
+        window.location.href = "https://otieu.com/4/10386652"
       } catch (err) {
         copyLink()
       }

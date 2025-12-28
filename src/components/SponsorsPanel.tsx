@@ -69,13 +69,7 @@ const SponsorsPanel: React.FC = () => {
       <div className="glass-card p-4 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-primary/5" />
         <div className="relative text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">
-              Premium
-            </p>
-            <Sparkles className="w-4 h-4 text-accent" />
-          </div>
+          <div id="container-9c351997fbecf2477790d9bdb0ba5c84"></div>
 
           <p className="font-display text-lg font-bold gradient-text mb-1">
             Boost Your Mining Power

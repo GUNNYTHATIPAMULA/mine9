@@ -36,21 +36,8 @@ const WalletPage: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <button className="glass-card p-4 text-center hover:border-primary/50 transition-all">
-            <div className="p-2.5 rounded-xl bg-green-500/20 w-fit mx-auto mb-2">
-              <ArrowDownLeft className="w-5 h-5 text-green-500" />
-            </div>
-            <p className="font-display font-bold text-sm">Receive</p>
-            <p className="text-xs text-muted-foreground">Deposit MNX</p>
-          </button>
-          <button className="glass-card p-4 text-center hover:border-primary/50 transition-all">
-            <div className="p-2.5 rounded-xl bg-blue-500/20 w-fit mx-auto mb-2">
-              <ArrowUpRight className="w-5 h-5 text-blue-500" />
-            </div>
-            <p className="font-display font-bold text-sm">Send</p>
-            <p className="text-xs text-muted-foreground">Withdraw MNX</p>
-          </button>
+        <div className="grid grid-cols-1 gap-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+         <div className="grid grid-cols-12 h-40 bg-secondary/30 "></div>
         </div>
 
         {/* Stats */}
