@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      // Allow authenticated users to read any user document (needed for referral lookups)
+      allow read: if request.auth != null;
+      
+      // Allow users to create their own profile during signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow users to update their own data
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow users to update referrer's data when using referral code (during signup)
+      allow update: if request.auth != null && 
+                       request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['referralsCount', 'balance', 'referralEarnings']);
+    }
+  }
+}

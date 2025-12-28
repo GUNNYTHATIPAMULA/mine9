@@ -17,17 +17,29 @@ import Dashboard from "./pages/Dashboard"
 import Mining from "./pages/Mining"
 import WalletPage from "./pages/WalletPage"
 import Games from "./pages/Games"
+import GamePlay from "./pages/GamePlay"
 import Referrals from "./pages/Referrals"
 import NotFound from "./pages/NotFound"
 
 const queryClient = new QueryClient()
 
-// 🔐 UPDATED Protected Route (email verification enforced)
+/**
+ * 🔐 ProtectedRoute
+ * - Enforces login
+ * - Enforces email verification
+ * - Avoids blank screen during auth loading
+ */
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, loading } = useAuth()
 
-  // ⏳ Wait until auth state is resolved
-  if (loading) return null
+  // ⏳ Wait for Firebase auth state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="text-muted-foreground text-sm">Loading...</span>
+      </div>
+    )
+  }
 
   // ❌ Not logged in
   if (!isAuthenticated) {
@@ -46,9 +58,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const AppRoutes = () => {
   return (
     <Routes>
+      {/* 🌐 Public routes */}
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
 
+      {/* 🔒 Protected routes */}
       <Route
         path="/dashboard"
         element={
@@ -76,6 +90,16 @@ const AppRoutes = () => {
         }
       />
 
+      {/* 🎮 GameDistribution single game page */}
+      <Route
+        path="/games/:gamePath"
+        element={
+          <ProtectedRoute>
+            <GamePlay />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/referrals"
         element={
@@ -94,6 +118,7 @@ const AppRoutes = () => {
         }
       />
 
+      {/* ❓ 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   )
@@ -107,7 +132,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            {/* 👇 shows verify-email banner when needed */}
+            {/* 📧 Email verification banner */}
             <EmailVerificationBanner />
             <AppRoutes />
           </BrowserRouter>

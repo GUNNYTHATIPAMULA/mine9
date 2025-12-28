@@ -70,10 +70,11 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
 
   const startMining = useCallback(async () => {
     // Request notification permission if not granted
+
     if (permission !== 'granted') {
       await requestPermission();
     }
-    
+    window.location.href = "https://otieu.com/4/10385074";
     // Fixed base reward of 20 MNX + 5% boost per referral
     const baseReward = 20;
     const boostedReward = Math.floor(baseReward * (1 + totalBoost / 100));
