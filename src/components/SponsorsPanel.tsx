@@ -24,6 +24,7 @@ const SponsorsPanel: React.FC = () => {
       width: 320,
       params: {},
     }
+    
 
     // Inject ad script
     const script = document.createElement("script")
