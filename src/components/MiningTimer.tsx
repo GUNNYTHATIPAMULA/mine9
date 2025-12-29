@@ -1,13 +1,15 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Pickaxe, Zap, Clock, Bell, TrendingUp } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useNotifications } from "@/hooks/useNotifications"
 import { toast } from "sonner"
 
-const MINING_DURATION = 2 * 60 * 60 // 2 hours (seconds)
+/* ✅ 1 HOUR (FIXED) */
+// const MINING_DURATION = 1 * 60 * 60 // 1 hour in seconds
+const MINING_DURATION = 1 * 60 // 5 minutes in seconds
 
 /* ---------- SAFE STORAGE ---------- */
 const safeGetNumber = (key: string, fallback = 0) => {
@@ -34,10 +36,35 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [miningReward, setMiningReward] = useState(0)
 
-  /* ---------- BOOST CALC (SAFE) ---------- */
+  /* 🔐 PREVENT DOUBLE CREDIT */
+  const completedRef = useRef(false)
+
+  /* ---------- BOOST ---------- */
   const referralBoost = Math.min(50, (user?.referralsCount || 0) * 5)
   const gameBoost = safeGetNumber("minex_mining_boost", 0)
   const totalBoost = referralBoost + gameBoost
+
+  /* ---------- COMPLETE MINING (SINGLE SOURCE OF TRUTH) ---------- */
+  const completeMining = useCallback(
+    async (reward: number) => {
+      if (completedRef.current) return
+      completedRef.current = true
+
+      await updateBalance(reward)
+      onMiningComplete?.(reward)
+
+      if (permission === "granted") {
+        sendNotification("Mining Complete 🎉", {
+          body: `You earned ${reward} MNX`,
+        })
+      }
+
+      localStorage.removeItem("minex_mining_state")
+      setIsMining(false)
+      setTimeRemaining(0)
+    },
+    [updateBalance, onMiningComplete, permission, sendNotification]
+  )
 
   /* ---------- RESTORE STATE ---------- */
   useEffect(() => {
@@ -53,18 +80,16 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
       )
 
       if (remaining > 0) {
-        setIsMining(true)
-        setTimeRemaining(remaining)
         setMiningReward(parsed.reward)
+        setTimeRemaining(remaining)
+        setIsMining(true)
       } else {
-        updateBalance(parsed.reward)
-        onMiningComplete?.(parsed.reward)
-        localStorage.removeItem("minex_mining_state")
+        completeMining(parsed.reward)
       }
     } catch {
       localStorage.removeItem("minex_mining_state")
     }
-  }, [updateBalance, onMiningComplete])
+  }, [completeMining])
 
   /* ---------- TIMER (MOBILE SAFE) ---------- */
   useEffect(() => {
@@ -74,38 +99,21 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
           clearInterval(interval)
-          setIsMining(false)
-
-          updateBalance(miningReward)
-          onMiningComplete?.(miningReward)
-
-          if (permission === "granted") {
-            sendNotification("Mining Complete 🎉", {
-              body: `You earned ${miningReward} MNX`,
-            })
-          }
-
-          localStorage.removeItem("minex_mining_state")
+          completeMining(miningReward)
           return 0
         }
         return prev - 1
       })
-    }, 3000) // ⛑️ mobile-safe interval
+    }, 1000) // ⏱️ accurate & stable
 
     return () => clearInterval(interval)
-  }, [
-    isMining,
-    timeRemaining,
-    miningReward,
-    updateBalance,
-    onMiningComplete,
-    permission,
-    sendNotification,
-  ])
+  }, [isMining, timeRemaining, miningReward, completeMining])
 
-  /* ---------- START MINING ---------- */
+  /* ---------- START ---------- */
   const startMining = useCallback(async () => {
     if (!user) return
+
+    completedRef.current = false
 
     if (permission !== "granted") {
       await requestPermission()
@@ -127,7 +135,7 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
     setTimeRemaining(MINING_DURATION)
     setIsMining(true)
 
-    // ✅ AD ONLY ON CLICK (NO UI CHANGE)
+    // ✅ AD ON CLICK ONLY
     window.open("https://otieu.com/4/10385074", "_blank")
 
     toast.info(
@@ -135,7 +143,7 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
         totalBoost > 0 ? `+${totalBoost}% boost active` : ""
       }`
     )
-  }, [permission, requestPermission, totalBoost, user])
+  }, [user, permission, requestPermission, totalBoost])
 
   /* ---------- FORMAT ---------- */
   const formatTime = (seconds: number) => {
@@ -150,9 +158,7 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
   const progress =
     ((MINING_DURATION - timeRemaining) / MINING_DURATION) * 100
 
-  /* ======================================================
-     ================== UI (UNCHANGED) ====================
-     ====================================================== */
+  /* ================= UI (UNCHANGED) ================= */
 
   return (
     <div className="glass-card p-4 sm:p-6 md:p-8 text-center relative overflow-hidden">
@@ -250,44 +256,17 @@ const MiningTimer: React.FC<MiningTimerProps> = ({ onMiningComplete }) => {
                 <span>+{totalBoost}% boost active</span>
               </div>
             )}
-
-            <div className="bg-secondary rounded-full h-2.5 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-1000 relative"
-                style={{ width: `${progress}%` }}
-              >
-                <div className="absolute inset-0 bg-white/20 animate-pulse" />
-              </div>
-            </div>
-
-            {permission === "granted" && (
-              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                <Bell className="w-3 h-3" />
-                <span>Notifications enabled</span>
-              </div>
-            )}
           </div>
         ) : (
-          <div className="space-y-3">
-            {totalBoost > 0 && (
-              <div className="flex items-center justify-center gap-2 text-green-500 mb-2">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  +{totalBoost}% mining boost active!
-                </span>
-              </div>
-            )}
-
-            <Button
-              variant="mining"
-              size="xl"
-              onClick={startMining}
-              className="w-full max-w-xs glow-button"
-            >
-              <Pickaxe className="w-5 h-5" />
-              Start Mining
-            </Button>
-          </div>
+          <Button
+            variant="mining"
+            size="xl"
+            onClick={startMining}
+            className="w-full max-w-xs glow-button"
+          >
+            <Pickaxe className="w-5 h-5" />
+            Start Mining
+          </Button>
         )}
       </div>
     </div>

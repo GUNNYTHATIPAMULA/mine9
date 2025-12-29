@@ -27,7 +27,7 @@ import {
 import { auth, googleProvider, db } from "@/lib/firebase"
 import { toast } from "sonner"
 
-interface User {
+export interface User {
   id: string
   email: string
   username: string
@@ -44,39 +44,45 @@ interface User {
 interface AuthContextType {
   user: User | null
   firebaseUser: FirebaseUser | null
-  isAuthenticated: boolean
   loading: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>
+  isAuthenticated: boolean
+  login: (email: string, password: string) => Promise<any>
+  loginWithGoogle: () => Promise<any>
   signup: (
     email: string,
     username: string,
     password: string,
-    referralCode?: string,
-  ) => Promise<{ success: boolean; error?: string }>
+    referralCode?: string
+  ) => Promise<any>
   logout: () => Promise<void>
+  updateBalance: (amount: number) => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | null>(null)
 
 const generateReferralCode = (username: string) =>
-  `${username.substring(0, 3).toUpperCase()}${Math.random()
+  `${username.slice(0, 3).toUpperCase()}${Math.random()
     .toString(36)
     .substring(2, 6)
     .toUpperCase()}`
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null)
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // 🔄 Auth state sync
+  /* ---------- AUTH STATE ---------- */
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+    const unsub = onAuthStateChanged(auth, async fbUser => {
       if (fbUser) {
         const snap = await getDoc(doc(db, "users", fbUser.uid))
         if (snap.exists()) {
-          setUser({ ...(snap.data() as User), emailVerified: fbUser.emailVerified })
+          setUser({
+            ...(snap.data() as User),
+            emailVerified: fbUser.emailVerified,
+          })
           setFirebaseUser(fbUser)
         }
       } else {
@@ -88,89 +94,116 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsub
   }, [])
 
-  // ---------------- LOGIN ----------------
-  const login = async (email: string, password: string) => {
-    try {
-      const res = await signInWithEmailAndPassword(auth, email, password)
-      await res.user.reload()
+  /* ---------- UPDATE BALANCE (MINING) ---------- */
+  const updateBalance = async (amount: number) => {
+    if (!user) return
 
-      const snap = await getDoc(doc(db, "users", res.user.uid))
-      if (!snap.exists()) return { success: false, error: "User data not found" }
+    const ref = doc(db, "users", user.id)
 
-      setUser({ ...(snap.data() as User), emailVerified: res.user.emailVerified })
-      setFirebaseUser(res.user)
-      return { success: true }
-    } catch (e: any) {
-      return { success: false, error: e.message }
-    }
+    await updateDoc(ref, {
+      balance: increment(amount),
+      totalMined: increment(amount),
+    })
+
+    setUser(prev =>
+      prev
+        ? {
+            ...prev,
+            balance: prev.balance + amount,
+            totalMined: prev.totalMined + amount,
+          }
+        : prev
+    )
   }
 
-  // ---------------- GOOGLE LOGIN ----------------
+  /* ---------- LOGIN ---------- */
+  const login = async (email: string, password: string) => {
+    const res = await signInWithEmailAndPassword(auth, email, password)
+    await res.user.reload()
+
+    if (!res.user.emailVerified)
+      return { success: false, error: "Verify email first" }
+
+    const snap = await getDoc(doc(db, "users", res.user.uid))
+    setUser({ ...(snap.data() as User), emailVerified: true })
+    setFirebaseUser(res.user)
+
+    return { success: true }
+  }
+
+  /* ---------- GOOGLE LOGIN ---------- */
   const loginWithGoogle = async () => {
-    try {
-      const res = await signInWithPopup(auth, googleProvider)
-      const fbUser = res.user
-      const ref = doc(db, "users", fbUser.uid)
-      const snap = await getDoc(ref)
+    const res = await signInWithPopup(auth, googleProvider)
+    const fbUser = res.user
 
-      if (!snap.exists()) {
-        const username =
-          fbUser.displayName?.replace(/\s+/g, "") ||
-          fbUser.email!.split("@")[0]
+    const ref = doc(db, "users", fbUser.uid)
+    const snap = await getDoc(ref)
 
-        const data: User = {
-          id: fbUser.uid,
-          email: fbUser.email!,
-          username,
-          balance: 0,
-          totalMined: 0,
-          referralCode: generateReferralCode(username),
-          referralsCount: 0,
-          referralEarnings: 0,
-          photoURL: fbUser.photoURL || undefined,
-          emailVerified: true,
-        }
+    if (!snap.exists()) {
+      const username =
+        fbUser.displayName?.replace(/\s+/g, "") ||
+        fbUser.email!.split("@")[0]
 
-        await setDoc(ref, { ...data, createdAt: serverTimestamp() })
-        setUser(data)
-      } else {
-        setUser({ ...(snap.data() as User), emailVerified: true })
+      const data: User = {
+        id: fbUser.uid,
+        email: fbUser.email!,
+        username,
+        balance: 0,
+        totalMined: 0,
+        referralCode: generateReferralCode(username),
+        referralsCount: 0,
+        referralEarnings: 0,
+        emailVerified: true,
       }
 
-      setFirebaseUser(fbUser)
-      return { success: true }
-    } catch (e: any) {
-      return { success: false, error: e.message }
+      await setDoc(ref, { ...data, createdAt: serverTimestamp() })
+      setUser(data)
+    } else {
+      setUser({ ...(snap.data() as User), emailVerified: true })
     }
+
+    setFirebaseUser(fbUser)
+    return { success: true }
   }
 
-  // ---------------- SIGNUP (EMAIL) ----------------
-  const signup = async (email: string, username: string, password: string, referralCode?: string) => {
+  /* ---------- SIGNUP WITH REFERRAL ---------- */
+  const signup = async (
+    email: string,
+    username: string,
+    password: string,
+    referralCode?: string
+  ) => {
     let cred: any = null
+
     try {
-      const nameSnap = await getDocs(
+      const nameCheck = await getDocs(
         query(collection(db, "users"), where("username", "==", username))
       )
-      if (!nameSnap.empty) return { success: false, error: "Username already taken" }
+      if (!nameCheck.empty)
+        return { success: false, error: "Username taken" }
 
       cred = await createUserWithEmailAndPassword(auth, email, password)
       const fbUser = cred.user
 
-      let referrerId: string | undefined
-      let bonus = 0
+      const NEW_USER_BONUS = 100
+      const REFERRER_BONUS = 150
+      let referrerId: string | null = null
 
       if (referralCode) {
         const refSnap = await getDocs(
-          query(collection(db, "users"), where("referralCode", "==", referralCode))
+          query(
+            collection(db, "users"),
+            where("referralCode", "==", referralCode)
+          )
         )
+
         if (!refSnap.empty) {
           referrerId = refSnap.docs[0].id
-          bonus = 10
 
           await updateDoc(doc(db, "users", referrerId), {
+            balance: increment(REFERRER_BONUS),
+            referralEarnings: increment(REFERRER_BONUS),
             referralsCount: increment(1),
-            balance: increment(15),
-            referralEarnings: increment(15),
           })
         }
       }
@@ -179,16 +212,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: fbUser.uid,
         email,
         username,
-        balance: bonus,
+        balance: referrerId ? NEW_USER_BONUS : 0,
         totalMined: 0,
         referralCode: generateReferralCode(username),
         referralsCount: 0,
         referralEarnings: 0,
+        referredBy: referrerId || undefined,
         emailVerified: false,
         createdAt: serverTimestamp(),
       }
-
-      if (referrerId) userData.referredBy = referrerId
 
       await setDoc(doc(db, "users", fbUser.uid), userData)
 
@@ -196,10 +228,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         url: `${window.location.origin}/auth`,
         handleCodeInApp: false,
       }
-      await sendEmailVerification(fbUser, settings)
 
-      toast.success("Verification email sent. Please verify before login.")
-      await signOut(auth) // 🔒 force logout until verification
+      await sendEmailVerification(fbUser, settings)
+      toast.success("Verify email before login")
+      await signOut(auth)
 
       return { success: true }
     } catch (e: any) {
@@ -219,12 +251,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         firebaseUser,
-        isAuthenticated: !!user,
         loading,
+        isAuthenticated: !!user,
         login,
         loginWithGoogle,
         signup,
         logout,
+        updateBalance,
       }}
     >
       {children}
@@ -234,6 +267,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider")
+  if (!ctx) throw new Error("useAuth must be inside AuthProvider")
   return ctx
 }
