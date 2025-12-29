@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react"
 import { useAuth } from "@/contexts/AuthContext"
-import { Users, Zap, User } from "lucide-react"
+import { Zap, User } from "lucide-react"
 
 interface TeamMember {
   id: string
@@ -12,11 +12,9 @@ interface TeamMember {
 const ReferralTeam: React.FC = () => {
   const { user } = useAuth()
   const [team, setTeam] = useState<TeamMember[]>([])
-  const [totalTeamMined, setTotalTeamMined] = useState(0)
-
   const adRef = useRef<HTMLDivElement | null>(null)
 
-  /* ---------- LOAD AD SAFELY ---------- */
+  /* ---------- LOAD SINGLE RESPONSIVE AD ---------- */
   useEffect(() => {
     if (!adRef.current) return
 
@@ -42,7 +40,7 @@ const ReferralTeam: React.FC = () => {
     }
   }, [])
 
-  /* ---------- LOAD TEAM (TEMP: LOCALSTORAGE) ---------- */
+  /* ---------- LOAD TEAM ---------- */
   useEffect(() => {
     const savedUsers = JSON.parse(
       localStorage.getItem("minex_users") || "[]"
@@ -58,23 +56,19 @@ const ReferralTeam: React.FC = () => {
       }))
 
     setTeam(referrals)
-    setTotalTeamMined(
-      referrals.reduce((sum: number, m: TeamMember) => sum + m.totalMined, 0)
-    )
   }, [user?.id])
 
   return (
     <div className="glass-card p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500">
-      
-        </div>
-
-        {/* ✅ AD PLACE (UNCHANGED POSITION) */}
-        <div ref={adRef} className="ml-auto" />
+      {/* ✅ RESPONSIVE AD */}
+      <div className="mb-4 flex justify-center">
+        <div
+          ref={adRef}
+          className="max-w-full overflow-hidden scale-[0.9] sm:scale-100"
+        />
       </div>
 
-      {/* Your Bonus */}
+      {/* Bonus */}
       <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-accent" />

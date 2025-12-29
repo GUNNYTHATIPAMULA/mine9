@@ -9,7 +9,7 @@ import { toast } from "sonner"
 
 /* ✅ 1 HOUR (FIXED) */
 // const MINING_DURATION = 1 * 60 * 60 // 1 hour in seconds
-const MINING_DURATION = 1 * 60 // 5 minutes in seconds
+const MINING_DURATION = 1 * 60 * 60 // 5 minutes in seconds
 
 /* ---------- SAFE STORAGE ---------- */
 const safeGetNumber = (key: string, fallback = 0) => {
